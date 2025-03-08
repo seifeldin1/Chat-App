@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Test</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <h2>Chat Test</h2>
+    
+    <label>Sender ID:</label>
+    <input type="text" id="senderId" placeholder="Enter your ID">
+
+    <label>Receiver ID:</label>
+    <input type="text" id="receiverId" placeholder="Enter receiver's ID">
+
+    <input type="text" id="messageInput" placeholder="Type a message...">
+    <button onclick="sendMessage()">Send</button>
+
+    <h3>Chat:</h3>
+    <div id="chat"></div>
+
+    <script>
+        const socket = io("http://localhost:3000");
+
+        socket.on("connect", () => {
+            console.log("Connected to server");
+        });
+
+        socket.on("receiveMessage", (message) => {
+            document.getElementById("chat").innerHTML += `<p><b>${message.sender}:</b> ${message.message}</p>`;
+        });
+
+        function sendMessage() {
+            const sender = document.getElementById("senderId").value;
+            const receiver = document.getElementById("receiverId").value;
+            const message = document.getElementById("messageInput").value;
+
+            if (!sender || !receiver || !message) {
+                alert("Please enter sender, receiver, and message.");
+                return;
+            }
+
+            socket.emit("sendMessage", { sender, receiver, message });
+        }
+    </script>
+</body>
+</html>
