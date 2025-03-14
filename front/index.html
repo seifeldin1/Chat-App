@@ -5,45 +5,181 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Test</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        .chat-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 400px;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .chat-box {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: #fff;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .message {
+            padding: 8px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        .message b {
+            color: #333;
+        }
+        .typing-indicator {
+            font-size: 14px;
+            color: gray;
+            margin-top: 5px;
+        }
+    </style>
 </head>
 <body>
-    <h2>Chat Test</h2>
-    
-    <label>Sender ID:</label>
-    <input type="text" id="senderId" placeholder="Enter your ID">
+    <div class="chat-container">
+        <h2>Chat Test</h2>
+        <label>Conversation ID:</label>
+        <input type="text" id="conversationId" placeholder="Enter conversation ID">
+        <button onclick="getMessages()">Load Messages</button>
 
-    <label>Receiver ID:</label>
-    <input type="text" id="receiverId" placeholder="Enter receiver's ID">
+        <label>Sender ID:</label>
+        <input type="text" id="senderId" placeholder="Enter your ID">
 
-    <input type="text" id="messageInput" placeholder="Type a message...">
-    <button onclick="sendMessage()">Send</button>
+        <label>Receiver ID:</label>
+        <input type="text" id="receiverId" placeholder="Enter receiver's ID">
 
-    <h3>Chat:</h3>
-    <div id="chat"></div>
+        <input type="text" id="messageInput" placeholder="Type a message..." oninput="notifyTyping()">
+        <button onclick="sendMessage()">Send</button>
+        <button onclick="leaveConversation()">Leave Conversation</button>
+
+
+        <h3>Chat:</h3>
+        <div class="chat-box" id="chat"></div>
+        <p class="typing-indicator" id="typing"></p>
+    </div>
 
     <script>
         const socket = io("http://localhost:3000");
-
+        let typingTimer;
+        const typingIndicator = document.getElementById("typing");
+        
         socket.on("connect", () => {
             console.log("Connected to server");
         });
 
         socket.on("receiveMessage", (message) => {
-            document.getElementById("chat").innerHTML += `<p><b>${message.sender}:</b> ${message.message}</p>`;
+            document.getElementById("chat").innerHTML += `<div class="message"><b>${message.sender}:</b> ${message.message}</div>`;
         });
 
+        socket.on("messageList", (messages) => {
+            const chatBox = document.getElementById("chat");
+            chatBox.innerHTML = "";
+            messages.forEach(msg => {
+                chatBox.innerHTML += `<div class="message"><b>${msg.sender}:</b> ${msg.message}</div>`;
+            });
+        });
+
+        socket.on("typing", (name) => {
+            typingIndicator.textContent = `${name} is typing...`;
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                typingIndicator.textContent = "";
+            }, 1000);
+        });
+
+        function joinConversation() {
+            const conversationId = document.getElementById("conversationId").value;
+            if (!conversationId) {
+                alert("Please enter a conversation ID.");
+                return;
+            }
+            socket.emit("joinConversation", { conversationId });
+        }
+
         function sendMessage() {
+            const conversationId = document.getElementById("conversationId").value;
             const sender = document.getElementById("senderId").value;
             const receiver = document.getElementById("receiverId").value;
             const message = document.getElementById("messageInput").value;
 
-            if (!sender || !receiver || !message) {
-                alert("Please enter sender, receiver, and message.");
+            if (!conversationId || !sender || !receiver || !message) {
+                alert("Please enter conversation ID, sender, receiver, and message.");
                 return;
             }
 
-            socket.emit("sendMessage", { sender, receiver, message });
+            socket.emit("sendMessage", { conversationId, sender, receiver, message });
+            document.getElementById("messageInput").value = "";
         }
+
+        function getMessages() {
+            const conversationId = document.getElementById("conversationId").value;
+            if (!conversationId) {
+                alert("Please enter a conversation ID to load messages.");
+                return;
+            }
+
+            // Join the conversation before loading messages
+            joinConversation();
+
+            socket.emit("getMessages", { conversationId });
+        }
+
+        function notifyTyping() {
+            const conversationId = document.getElementById("conversationId").value;
+            const sender = document.getElementById("senderId").value;
+
+            if (conversationId && sender) {
+                socket.emit("typing", { conversationId, senderId: sender });
+            }
+        }
+
+        function leaveConversation() {
+            const conversationId = document.getElementById("conversationId").value;
+
+            if (!conversationId) {
+                alert("You are not in any conversation yet.");
+                return;
+            }
+
+            socket.emit("leaveConversation", { conversationId });
+
+            // Clear the chat messages and reset conversationId
+            document.getElementById("chat").innerHTML = "";
+            document.getElementById("conversationId").value = "";
+            alert("You left the conversation.");
+        }
+
+
+
+
     </script>
 </body>
 </html>
